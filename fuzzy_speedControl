@@ -1,0 +1,95 @@
+/*     模糊控制系統範例-機車油門控制    */
+/* 詳細的解釋我都放在論壇了，請搭配服用 */
+#include <stdio.h>
+#include <stdlib.h>
+
+#define DISCRETIZATION 17
+
+#define max(a,b) ((a)>(b)?(a):(b))
+#define min(a,b) ((a)<(b)?(a):(b))
+
+float SpeedControl(float speed){
+	int i = 0;
+	
+	/* slowDown, hold, speedUp 三個是輸出語意項離散後的結果 */
+	float slowDown[DISCRETIZATION] = {1.0, 1.0, 1.0, 1.0, 0.75, 0.5, 0.25, 0.0, 0.0, 0.0,  0.0, 0.0,  0.0, 0.0, 0.0, 0.0, 0.0};
+	float hold[DISCRETIZATION]     = {0.0, 0.0, 0.0, 0.0,  0.0, 0.0,  0.0, 0.5, 1.0, 0.6,  0.0, 0.0,  0.0, 0.0, 0.0, 0.0, 0.0};
+	float speedUp[DISCRETIZATION]  = {0.0, 0.0, 0.0, 0.0,  0.0, 0.0,  0.0, 0.0, 0.0, 0.0, 0.25, 0.5, 0.75, 1.0, 1.0, 1.0, 1.0};
+	
+	/* angle 是輸出油門角度的實際數字 */
+	float angle[DISCRETIZATION];
+	
+	/* u_Speed 是車速的程度值, u_Angle 是油門角度的程度值集合 */
+	float u_Speed, *u_Angle;
+	
+	/* area, moment 用來做重心法運算 */
+	float area = 0.0, moment = 0.0;
+	
+	for(i = 0; i < DISCRETIZATION; ++i){
+		angle[i] = i * 10.0;
+	}
+	u_Angle = (float *) calloc(sizeof(float) * DISCRETIZATION, sizeof(float));
+	
+	/* 規則一 */
+	u_Speed = 0.0;														//
+	if(speed <= 8.0){													//
+		u_Speed = 1.0;													//
+	}                                             						// 這一塊是將輸入模糊化的部分
+	if(speed >= 8.0 && speed <= 18.0){									//
+		u_Speed = (18.0 - speed) / 10.0;          						//
+	}																	//
+	
+	if(u_Speed != 0.0){													//
+		for(i = 0; i < DISCRETIZATION; ++i){                            //
+			u_Angle[i] = max(u_Angle[i], min(u_Speed, speedUp[i]));     // 這裡是模糊推論的部分，使用max-min推論方式
+		}                                                               //
+	}
+	
+	/* 規則二 */
+	u_Speed = 0.0;
+	if(speed >= 10.0 && speed <= 20.0){
+		u_Speed = (speed - 10.0) / 10.0;
+	}
+	if(speed >= 20.0 && speed <= 29.0){
+		u_Speed = (29.0 - speed) / 9.0;
+	}
+	if(u_Speed != 0.0){
+		for(i = 0; i < DISCRETIZATION; ++i){
+			u_Angle[i] = max(u_Angle[i], min(u_Speed, hold[i]));
+		}
+	}
+	
+	/* 規則三 */
+	u_Speed = 0.0;
+	if(speed >= 22.0 && speed <= 32.0){
+		u_Speed = (speed - 22.0) / 10.0;
+	}
+	if(speed >= 32.0){
+		u_Speed = 1.0;
+	}
+	if(u_Speed != 0.0){
+		for(i = 0; i < DISCRETIZATION; ++i){
+			u_Angle[i] = max(u_Angle[i], min(u_Speed, slowDown[i]));
+		}
+	}
+	
+	/* 解模糊化 */
+	for(i = 0; i < DISCRETIZATION; ++i){
+		area += u_Angle[i];												// area 用來記錄輸出程度值的加總
+		moment += (u_Angle[i] * angle[i]);								// moment 用來記錄輸出程度值乘以輸出實際值的加總
+	}
+	free(u_Angle);
+	
+	return (moment / area);												// 回傳重心法的結果
+}
+
+int main(void){
+	float input;
+	float output;
+	printf("請輸入車速:");
+	scanf("%f", &input);
+	output = SpeedControl(input);
+	printf("輸入的車速:%f\t輸出的油門角度:%f\n", input, output);
+	system("PAUSE");
+	return 0;
+}
